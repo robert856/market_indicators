@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Market Indicators Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@400;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f8f7f4;
+    --surface: #ffffff;
+    --surface2: #f1f0ec;
+    --border: rgba(0,0,0,0.10);
+    --border2: rgba(0,0,0,0.18);
+    --text1: #1a1a18;
+    --text2: #5a5955;
+    --text3: #9a9891;
+    --up-bg: #eaf3de; --up-txt: #2e5a0e;
+    --dn-bg: #fcebeb; --dn-txt: #8a2020;
+    --neu-bg: #f1f0ec; --neu-txt: #5a5955;
+    --radius-md: 8px;
+    --radius-lg: 14px;
+    --radius-xl: 20px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16151200;
+      --surface: #1e1d1a;
+      --surface2: #2a2926;
+      --border: rgba(255,255,255,0.09);
+      --border2: rgba(255,255,255,0.16);
+      --text1: #f0ede6;
+      --text2: #a09d96;
+      --text3: #6a6760;
+      --up-bg: #173404; --up-txt: #97C459;
+      --dn-bg: #2e0f0f; --dn-txt: #f09595;
+      --neu-bg: #2a2926; --neu-txt: #a09d96;
+    }
+  }
+
+  html { background: var(--bg); }
+  body {
+    font-family: 'Syne', sans-serif;
+    background: var(--bg);
+    color: var(--text1);
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  .page-wrapper {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 4rem;
+  }
+
+  /* ── HEADER ── */
+  .page-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 0.5px solid var(--border);
+  }
+  .brand {
+    font-size: 13px; font-weight: 700; letter-spacing: 3px;
+    text-transform: uppercase; color: var(--text3);
+    font-family: 'IBM Plex Mono', monospace;
+    margin-bottom: 6px;
+  }
+  .header-left h1 {
+    font-size: clamp(22px, 4vw, 32px);
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    line-height: 1.1;
+  }
+  .header-left p {
+    font-size: 13px;
+    color: var(--text2);
+    margin-top: 4px;
+  }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  #upd-time { font-size: 11px; color: var(--text3); font-family: 'IBM Plex Mono', monospace; }
+  .btn-refresh {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 12px; font-family: 'Syne', sans-serif; font-weight: 600;
+    background: none; border: 0.5px solid var(--border2);
+    color: var(--text2); cursor: pointer; padding: 6px 14px;
+    border-radius: var(--radius-md); transition: background 0.15s, color 0.15s;
+  }
+  .btn-refresh:hover { background: var(--surface2); color: var(--text1); }
+  .btn-refresh i { font-size: 14px; }
+
+  /* ── SECTION LABELS ── */
+  .section-label {
+    font-size: 10px; font-weight: 700; letter-spacing: 1.2px;
+    text-transform: uppercase; color: var(--text3);
+    margin: 1.75rem 0 0.75rem;
+  }
+
+  /* ── GRID ── */
+  .mkt-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 10px;
+  }
+
+  /* ── CARD ── */
+  .mkt-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px 18px;
+    position: relative;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .mkt-card:hover {
+    border-color: var(--border2);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+
+  .rank-badge {
+    position: absolute; top: 14px; right: 16px;
+    font-size: 11px; font-weight: 600;
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--text3);
+  }
+
+  .card-top { display: flex; align-items: flex-start; gap: 11px; margin-bottom: 2px; }
+  .card-icon {
+    width: 36px; height: 36px; border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px; flex-shrink: 0;
+  }
+  .card-name { font-size: 14px; font-weight: 700; }
+  .card-ticker { font-size: 10px; font-family: 'IBM Plex Mono', monospace; color: var(--text3); margin-top: 1px; }
+  .card-desc { font-size: 11px; color: var(--text2); margin-top: 3px; line-height: 1.45; }
+
+  .card-value-row {
+    display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+    margin-top: 11px; border-top: 0.5px solid var(--border); padding-top: 11px;
+  }
+  .card-value {
+    font-family: 'IBM Plex Mono', monospace; font-size: 22px; font-weight: 500;
+  }
+  .card-change {
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 500;
+    padding: 3px 8px; border-radius: 5px;
+  }
+  .up  { background: var(--up-bg);  color: var(--up-txt); }
+  .dn  { background: var(--dn-bg);  color: var(--dn-txt); }
+  .neu { background: var(--neu-bg); color: var(--neu-txt); }
+
+  .card-sub {
+    font-size: 11px; color: var(--text3);
+    margin-top: 6px; font-family: 'IBM Plex Mono', monospace;
+    line-height: 1.4;
+  }
+
+  /* ── FEAR & GREED ── */
+  .fear-score {
+    font-family: 'IBM Plex Mono', monospace; font-size: 22px; font-weight: 500;
+  }
+  .fear-label {
+    font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 5px;
+  }
+  .fear-bar-wrap {
+    margin-top: 11px; border-top: 0.5px solid var(--border); padding-top: 11px;
+  }
+  .fear-score-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
+  .fear-bar-track {
+    height: 6px; border-radius: 3px;
+    background: linear-gradient(to right, #c0392b, #e67e22, #27ae60);
+    position: relative; margin: 4px 0 6px;
+  }
+  .fear-needle {
+    position: absolute; top: -5px;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: var(--text1); border: 2px solid var(--surface);
+    transform: translateX(-50%); transition: left 0.9s cubic-bezier(.4,0,.2,1);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+  }
+  .fear-axis { display: flex; justify-content: space-between; font-size: 9.5px; color: var(--text3); font-family: 'IBM Plex Mono', monospace; margin-top: 2px; }
+
+  /* ── SKELETON ── */
+  .skel {
+    display: inline-block; border-radius: 4px;
+    background: var(--surface2); animation: pulse 1.3s ease-in-out infinite;
+  }
+  .skel-lg { width: 90px; height: 20px; }
+  .skel-sm { width: 60px; height: 14px; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
+
+  /* ── FOOTER ── */
+  .page-footer {
+    margin-top: 2.5rem;
+    padding-top: 1.25rem;
+    border-top: 0.5px solid var(--border);
+    font-size: 11px; color: var(--text3); line-height: 1.6;
+  }
+  .page-footer a { color: var(--text2); }
+
+  /* ── VIX SIGNAL ── */
+  .vix-signal {
+    display: inline-block; font-size: 10px; font-weight: 600;
+    padding: 2px 7px; border-radius: 4px; margin-top: 4px;
+  }
+</style>
+</head>
+<body>
+<div class="page-wrapper">
+
+  <header class="page-header">
+    <div class="header-left">
+      <div class="brand">RJW</div>
+      <h1>Market Indicators</h1>
+      <p>Top signals ranked by importance — most to least</p>
+    </div>
+    <div class="header-right">
+      <span id="upd-time">loading…</span>
+      <button class="btn-refresh" onclick="loadAll()">
+        <i class="ti ti-refresh"></i> Refresh
+      </button>
+    </div>
+  </header>
+
+  <p class="section-label">Primary Benchmarks</p>
+  <div class="mkt-grid" id="grid-primary"></div>
+
+  <p class="section-label">Sentiment &amp; Risk</p>
+  <div class="mkt-grid" id="grid-sentiment"></div>
+
+  <footer class="page-footer">
+    Data via Yahoo Finance (15–20 min delay) &amp; CNN Fear &amp; Greed Index. &nbsp;|&nbsp;
+    Not financial advice. &nbsp;|&nbsp;
+    Fed Funds Rate updates 8×/year at FOMC meetings. &nbsp;|&nbsp;
+    Put/Call Ratio requires paid CBOE feed.
+  </footer>
+
+</div>
+
+<script>
+const CORS = 'https://corsproxy.io/?url=';
+
+const PRIMARY = [
+  {
+    rank: 1, id: 'sp500', name: 'S&P 500', ticker: '^GSPC',
+    desc: '500 large-cap US stocks — the primary benchmark for the entire market.',
+    icon: '📈', iconBg: '#dbeafe', sym: '^GSPC', dec: 2
+  },
+  {
+    rank: 2, id: 'fedfunds', name: 'Fed Funds Rate', ticker: 'FEDFUNDS',
+    desc: 'Federal Reserve benchmark rate. Drives cost of borrowing across the economy.',
+    icon: '🏛', iconBg: '#ede9fe', static: true
+  },
+  {
+    rank: 3, id: 'tnx', name: '10-Yr Treasury', ticker: '^TNX',
+    desc: 'The risk-free rate. Everything in finance is priced relative to this yield.',
+    icon: '📊', iconBg: '#d1fae5', sym: '^TNX', dec: 3
+  },
+  {
+    rank: 4, id: 'dji', name: 'Dow Jones', ticker: '^DJI',
+    desc: '30 blue-chip stocks. The most quoted index — large-cap pulse check.',
+    icon: '🏢', iconBg: '#fef3c7', sym: '^DJI', dec: 2
+  },
+  {
+    rank: 5, id: 'ixic', name: 'NASDAQ Composite', ticker: '^IXIC',
+    desc: 'Tech-heavy benchmark. Leads growth/risk sentiment in both directions.',
+    icon: '💻', iconBg: '#dcfce7', sym: '^IXIC', dec: 2
+  },
+  {
+    rank: 6, id: 'dxy', name: 'US Dollar Index', ticker: 'DX-Y.NYB',
+    desc: 'USD vs basket of currencies. Strong dollar pressures multinationals & commodities.',
+    icon: '💵', iconBg: '#fce7f3', sym: 'DX-Y.NYB', dec: 3
+  },
+];
+
+const SENTIMENT = [
+  {
+    rank: 7, id: 'vix', name: 'VIX', ticker: '^VIX',
+    desc: 'The "fear gauge." Expected S&P 500 volatility over 30 days. &lt;15 = calm, &gt;30 = fear.',
+    icon: '⚡', iconBg: '#fee2e2', sym: '^VIX', dec: 2, isVix: true
+  },
+  {
+    rank: 'S', id: 'feargreed', name: 'Fear & Greed Index', ticker: 'CNN',
+    desc: 'Composite of 7 inputs. Extreme fear → buy signal. Extreme greed → caution.',
+    icon: '🧠', iconBg: '#f3f4f6', feargreed: true
+  },
+  {
+    rank: 'S', id: 'putcall', name: 'Put/Call Ratio', ticker: 'CBOE',
+    desc: 'Puts (bearish bets) vs calls (bullish bets). &gt;1.0 = bearish sentiment. &lt;0.7 = complacency.',
+    icon: '⚖️', iconBg: '#dbeafe', static: true, pcStatic: true
+  },
+];
+
+/* ── Utilities ── */
+function fmt(n, dec) {
+  if (n == null || isNaN(n)) return '--';
+  return n.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+function chgClass(c) { return c > 0 ? 'up' : c < 0 ? 'dn' : 'neu'; }
+function pfx(c) { return c > 0 ? '+' : ''; }
+function fearLabel(s) {
+  if (s <= 24) return ['Extreme Fear', 'dn'];
+  if (s <= 44) return ['Fear', 'dn'];
+  if (s <= 55) return ['Neutral', 'neu'];
+  if (s <= 74) return ['Greed', 'up'];
+  return ['Extreme Greed', 'up'];
+}
+function vixSignal(v) {
+  if (v < 15) return ['🟢 Low volatility — calm market', 'up'];
+  if (v < 20) return ['🟡 Normal range', 'neu'];
+  if (v < 30) return ['🟠 Elevated anxiety', 'neu'];
+  return ['🔴 High fear — market stress', 'dn'];
+}
+
+/* ── Build card HTML ── */
+function cardHTML(ind) {
+  const rank = typeof ind.rank === 'number' ? `#${ind.rank}` : ind.rank;
+
+  if (ind.feargreed) {
+    return `<div class="mkt-card" id="card-${ind.id}">
+      <span class="rank-badge">${rank}</span>
+      <div class="card-top">
+        <div class="card-icon" style="background:${ind.iconBg}">${ind.icon}</div>
+        <div>
+          <div class="card-name">${ind.name}</div>
+          <div class="card-ticker">${ind.ticker}</div>
+          <div class="card-desc">${ind.desc}</div>
+        </div>
+      </div>
+      <div class="fear-bar-wrap">
+        <div class="fear-score-row">
+          <span class="fear-score" id="val-${ind.id}"><span class="skel skel-lg"></span></span>
+          <span class="fear-label neu" id="chg-${ind.id}"></span>
+        </div>
+        <div class="fear-bar-track">
+          <div class="fear-needle" id="needle-${ind.id}" style="left:50%"></div>
+        </div>
+        <div class="fear-axis">
+          <span>0 — Extreme Fear</span>
+          <span>50</span>
+          <span>Extreme Greed — 100</span>
+        </div>
+        <div class="card-sub" id="sub-${ind.id}"></div>
+      </div>
+    </div>`;
+  }
+
+  return `<div class="mkt-card" id="card-${ind.id}">
+    <span class="rank-badge">${rank}</span>
+    <div class="card-top">
+      <div class="card-icon" style="background:${ind.iconBg}">${ind.icon}</div>
+      <div>
+        <div class="card-name">${ind.name}</div>
+        <div class="card-ticker">${ind.ticker}</div>
+        <div class="card-desc">${ind.desc}</div>
+      </div>
+    </div>
+    <div class="card-value-row">
+      <span class="card-value" id="val-${ind.id}"><span class="skel skel-lg"></span></span>
+      <span class="card-change neu" id="chg-${ind.id}"><span class="skel skel-sm"></span></span>
+    </div>
+    <div class="card-sub" id="sub-${ind.id}"></div>
+  </div>`;
+}
+
+function renderSection(ids, containerId) {
+  document.getElementById(containerId).innerHTML = ids.map(cardHTML).join('');
+}
+
+/* ── Setters ── */
+function setVal(id, txt) {
+  const el = document.getElementById('val-' + id);
+  if (el) { el.innerHTML = ''; el.textContent = txt; }
+}
+function setChg(id, cls, txt) {
+  const el = document.getElementById('chg-' + id);
+  if (el) { el.innerHTML = ''; el.className = 'card-change ' + cls; el.textContent = txt; }
+}
+function setSub(id, txt) {
+  const el = document.getElementById('sub-' + id);
+  if (el) el.textContent = txt;
+}
+
+/* ── Fetch Yahoo Finance ── */
+async function fetchYahoo(symbol) {
+  try {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=2d`;
+    const res = await fetch(CORS + encodeURIComponent(url));
+    const data = await res.json();
+    const meta = data?.chart?.result?.[0]?.meta;
+    if (!meta) return null;
+    const price = meta.regularMarketPrice ?? meta.previousClose;
+    const prev  = meta.chartPreviousClose ?? meta.previousClose;
+    const chg   = price - prev;
+    const pct   = prev ? (chg / prev) * 100 : 0;
+    return { price, chg, pct };
+  } catch (e) { return null; }
+}
+
+/* ── Fetch Fear & Greed ── */
+async function fetchFG() {
+  try {
+    const url = 'https://production.dataviz.cnn.io/index/fearandgreed/graphdata';
+    const res = await fetch(CORS + encodeURIComponent(url));
+    const data = await res.json();
+    const score = Math.round(data?.fear_and_greed?.score);
+    if (!isNaN(score)) return { score };
+  } catch (e) {}
+  return null;
+}
+
+/* ── Main loader ── */
+async function loadAll() {
+  document.getElementById('upd-time').textContent = 'updating…';
+
+  renderSection(PRIMARY,   'grid-primary');
+  renderSection(SENTIMENT, 'grid-sentiment');
+
+  /* Fed Funds — static */
+  setVal('fedfunds', '5.33%');
+  setChg('fedfunds', 'neu', 'unchanged');
+  setSub('fedfunds', 'FOMC target range: 5.25–5.50%');
+
+  /* Put/Call — static approximation */
+  setVal('putcall', '~0.82');
+  setChg('putcall', 'neu', 'slightly bearish');
+  setSub('putcall', 'Live data requires CBOE subscription');
+
+  /* Yahoo tickers */
+  const tickers = [
+    { id: 'sp500', sym: '^GSPC',      dec: 2 },
+    { id: 'tnx',   sym: '^TNX',       dec: 3 },
+    { id: 'dji',   sym: '^DJI',       dec: 2 },
+    { id: 'ixic',  sym: '^IXIC',      dec: 2 },
+    { id: 'vix',   sym: '^VIX',       dec: 2 },
+    { id: 'dxy',   sym: 'DX-Y.NYB',   dec: 3 },
+  ];
+
+  await Promise.all(tickers.map(async t => {
+    const d = await fetchYahoo(t.sym);
+    if (d) {
+      setVal(t.id, fmt(d.price, t.dec));
+      setChg(t.id, chgClass(d.chg),
+        `${pfx(d.chg)}${fmt(d.chg, 2)}  (${pfx(d.pct)}${fmt(d.pct, 2)}%)`);
+
+      if (t.id === 'vix') {
+        const [sig, cls] = vixSignal(d.price);
+        setSub('vix', sig);
+      } else if (t.id === 'tnx') {
+        setSub('tnx', `Yield: ${fmt(d.price, 3)}%`);
+      } else if (t.id === 'dxy') {
+        setSub('dxy', 'USD vs EUR, JPY, GBP, CAD, SEK, CHF');
+      }
+    } else {
+      setVal(t.id, '—');
+      setChg(t.id, 'neu', 'unavailable');
+      setSub(t.id, 'Data fetch failed — try refreshing');
+    }
+  }));
+
+  /* Fear & Greed */
+  const fg = await fetchFG();
+  if (fg && !isNaN(fg.score)) {
+    const s = fg.score;
+    setVal('feargreed', String(s));
+    const [lbl, cls] = fearLabel(s);
+    const chgEl = document.getElementById('chg-feargreed');
+    if (chgEl) { chgEl.className = 'fear-label ' + cls; chgEl.textContent = lbl; }
+    const needle = document.getElementById('needle-feargreed');
+    if (needle) needle.style.left = s + '%';
+    setSub('feargreed', 'CNN composite: momentum, breadth, VIX, bonds, safe havens');
+  } else {
+    setVal('feargreed', '—');
+    const chgEl = document.getElementById('chg-feargreed');
+    if (chgEl) { chgEl.className = 'fear-label neu'; chgEl.textContent = 'unavailable'; }
+    setSub('feargreed', 'CNN endpoint rate-limited — try refreshing');
+  }
+
+  /* Timestamp */
+  const now = new Date();
+  document.getElementById('upd-time').textContent =
+    'Updated ' + now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
+
+loadAll();
+</script>
+</body>
+</html>
