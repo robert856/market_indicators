@@ -619,7 +619,10 @@ async function loadAll() {
   renderSection(PRIMARY,   'grid-primary');
   renderSection(SENTIMENT, 'grid-sentiment');
 
-  /* Fed Funds — live from FRED (effective rate) */
+  /* Fed Funds — show known value immediately, then try FRED to confirm */
+  setVal('fedfunds', '3.63%');
+  setChg('fedfunds', 'neu', 'unchanged');
+  setSub('fedfunds', 'FOMC target range: 3.50–3.75%  ·  next meeting Jun 17–18');
   (async () => {
     try {
       const fredUrl = 'https://fred.stlouisfed.org/graph/fredgraph.csv?id=EFFR&vintage_date=' + new Date().toISOString().slice(0,10);
@@ -632,16 +635,10 @@ async function loadAll() {
         const rate = parts[1] ? parseFloat(parts[1]) : NaN;
         if (!isNaN(rate)) {
           setVal('fedfunds', rate.toFixed(2) + '%');
-          setChg('fedfunds', 'neu', 'unchanged');
           setSub('fedfunds', 'FOMC target range: 3.50–3.75%  ·  source: FRED');
-          return;
         }
       }
     } catch(e) {}
-    /* fallback to current known values if FRED unavailable */
-    setVal('fedfunds', '3.63%');
-    setChg('fedfunds', 'neu', 'unchanged');
-    setSub('fedfunds', 'FOMC target range: 3.50–3.75%  ·  last updated May 2026');
   })();
 
   /* Put/Call Ratio — live from CBOE public CSV */
