@@ -217,8 +217,8 @@
   .mkt-card {
     cursor: pointer;
   }
-  .mkt-card:hover { background: #2a2a2a; }
-  .mkt-card:active { background: #1a1a1a; }
+  .mkt-card:hover { background: var(--surface2); }
+  .mkt-card:active { background: var(--surface2); }
   .card-hint {
     position: absolute; bottom: 12px; right: 14px;
     font-size: 10px; color: var(--text3);
@@ -308,10 +308,10 @@
   <div class="mkt-grid" id="grid-sentiment"></div>
 
   <footer class="page-footer">
-    Data via Yahoo Finance (15–20 min delay) &amp; CNN Fear &amp; Greed Index. &nbsp;|&nbsp;
+    Data via Yahoo Finance (15–20 min delay), CNN Fear &amp; Greed Index &amp; FRED (Federal Reserve). &nbsp;|&nbsp;
     Not financial advice. &nbsp;|&nbsp;
     Fed Funds Rate updates 8×/year at FOMC meetings. &nbsp;|&nbsp;
-    Put/Call Ratio requires paid CBOE feed.
+    Put/Call Ratio via CBOE public data (15-min delay).
   </footer>
 
 </div>
@@ -334,7 +334,20 @@
 </div>
 
 <script>
-const CORS = 'https://corsproxy.io/?url=';
+/* ── CORS proxies — try in order until one works ── */
+const PROXIES = [
+  'https://corsproxy.io/?url=',
+  'https://api.allorigins.win/raw?url=',
+];
+async function proxiedFetch(url) {
+  for (const p of PROXIES) {
+    try {
+      const r = await fetch(p + encodeURIComponent(url));
+      if (r.ok) return r;
+    } catch(e) {}
+  }
+  return null;
+}
 
 const PRIMARY = [
   {
@@ -553,7 +566,8 @@ function setSub(id, txt) {
 async function fetchYahoo(symbol) {
   try {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=2d`;
-    const res = await fetch(CORS + encodeURIComponent(url));
+    const res = await proxiedFetch(url);
+    if (!res) return null;
     const data = await res.json();
     const meta = data?.chart?.result?.[0]?.meta;
     if (!meta) return null;
@@ -569,11 +583,32 @@ async function fetchYahoo(symbol) {
 async function fetchFG() {
   try {
     const url = 'https://production.dataviz.cnn.io/index/fearandgreed/graphdata';
-    const res = await fetch(CORS + encodeURIComponent(url));
+    const res = await proxiedFetch(url);
+    if (!res) return null;
     const data = await res.json();
     const score = Math.round(data?.fear_and_greed?.score);
     if (!isNaN(score)) return { score };
   } catch (e) {}
+  return null;
+}
+
+/* ── Fetch Put/Call Ratio from CBOE ── */
+async function fetchPutCall() {
+  try {
+    const url = 'https://www.cboe.com/publish/scheduledtask/mktdata/cboestoredvolume/put_call_ratios.csv';
+    const res = await proxiedFetch(url);
+    if (!res) return null;
+    const text = await res.text();
+    const lines = text.trim().split('\n').filter(l => l.trim() && !l.startsWith('DATE') && !l.startsWith('"DATE'));
+    if (!lines.length) return null;
+    const last = lines[lines.length - 1];
+    const parts = last.split(',');
+    /* columns: DATE, PC_ALL, PC_EQUITY, PC_INDEX, PC_ETF */
+    const pcAll = parseFloat(parts[1]);
+    const pcEq  = parseFloat(parts[2]);
+    const date  = parts[0] ? parts[0].replace(/"/g,'').trim() : '';
+    if (!isNaN(pcAll)) return { pcAll, pcEq, date };
+  } catch(e) {}
   return null;
 }
 
@@ -584,15 +619,47 @@ async function loadAll() {
   renderSection(PRIMARY,   'grid-primary');
   renderSection(SENTIMENT, 'grid-sentiment');
 
-  /* Fed Funds — static */
-  setVal('fedfunds', '5.33%');
-  setChg('fedfunds', 'neu', 'unchanged');
-  setSub('fedfunds', 'FOMC target range: 5.25–5.50%');
+  /* Fed Funds — live from FRED (effective rate) */
+  (async () => {
+    try {
+      const fredUrl = 'https://fred.stlouisfed.org/graph/fredgraph.csv?id=EFFR&vintage_date=' + new Date().toISOString().slice(0,10);
+      const res = await proxiedFetch(fredUrl);
+      if (res) {
+        const text = await res.text();
+        const lines = text.trim().split('\n').filter(l => l && !l.startsWith('DATE'));
+        const last = lines[lines.length - 1];
+        const parts = last ? last.split(',') : [];
+        const rate = parts[1] ? parseFloat(parts[1]) : NaN;
+        if (!isNaN(rate)) {
+          setVal('fedfunds', rate.toFixed(2) + '%');
+          setChg('fedfunds', 'neu', 'unchanged');
+          setSub('fedfunds', 'FOMC target range: 3.50–3.75%  ·  source: FRED');
+          return;
+        }
+      }
+    } catch(e) {}
+    /* fallback to current known values if FRED unavailable */
+    setVal('fedfunds', '3.63%');
+    setChg('fedfunds', 'neu', 'unchanged');
+    setSub('fedfunds', 'FOMC target range: 3.50–3.75%  ·  last updated May 2026');
+  })();
 
-  /* Put/Call — static approximation */
-  setVal('putcall', '~0.82');
-  setChg('putcall', 'neu', 'slightly bearish');
-  setSub('putcall', 'Live data requires CBOE subscription');
+  /* Put/Call Ratio — live from CBOE public CSV */
+  (async () => {
+    const d = await fetchPutCall();
+    if (d && !isNaN(d.pcAll)) {
+      const cls = d.pcAll > 1.0 ? 'dn' : d.pcAll < 0.7 ? 'up' : 'neu';
+      const lbl = d.pcAll > 1.0 ? 'bearish' : d.pcAll < 0.7 ? 'complacent' : 'neutral';
+      setVal('putcall', d.pcAll.toFixed(2));
+      setChg('putcall', cls, lbl);
+      const eqTxt = !isNaN(d.pcEq) ? `  equity: ${d.pcEq.toFixed(2)}` : '';
+      setSub('putcall', `CBOE all-vol${eqTxt}  ·  ${d.date}`);
+    } else {
+      setVal('putcall', '—');
+      setChg('putcall', 'neu', 'unavailable');
+      setSub('putcall', 'CBOE feed unavailable — try refreshing');
+    }
+  })();
 
   /* Yahoo tickers */
   const tickers = [
